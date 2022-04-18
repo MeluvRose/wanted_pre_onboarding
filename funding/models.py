@@ -9,6 +9,7 @@ class Goods(models.Model):
     goal = models.PositiveIntegerField(blank=True, null=True)
     date_limit = models.DateField()
     price_per_time = models.IntegerField(blank=True, null=True)
+    progress_rate = models.IntegerField()
 
     class Meta:
         managed = False
