@@ -1,13 +1,32 @@
 from django.shortcuts import render, HttpResponse, redirect
 from django.views.decorators.csrf import csrf_exempt
 from .models import Goods
-
-
+import datetime
 
 # Create your views here.
 def post_goods(request):
-    article = 'this page for crawed funding'
+    posts = Goods.objects.all()
+    search = request.GET.get('search')
+    order = request.GET.get('order')
+    article = '''
+        <form action="/" method="GET">
+            <p><input type="text" name="search" placeholder="Search"></p>
+            <p><input type="text" name="order" placeholder="Order by"></p>
+            <p><input type="submit"></p>
+        </form>
+    '''
+    # if not((search == None and search == None)
+    #     or (search == '' and search == '')):
+    if search != None and search != '':
+        posts = posts.filter(title__contains=search)
+        article += f'<h4>Search By {search}</h4>'
+    if order != None and order != '':
+        posts = posts.order_by(order)
+        article += f'<h4>Order By {order}</h4>'
+    for post in posts:
+        article += f"<li><a href='/read/{post.id}'>{post.title}</a></li>"
     return HTMLTempleate(article)
+
 
 @csrf_exempt
 def create(request):
@@ -51,21 +70,33 @@ def create(request):
         posts = Goods.objects.all()
         return redirect('/read/' + str(next_id))
 
+@csrf_exempt
 def read(request, pk):
-    posts = Goods.objects.all()
-    
-    article = [f'''
-        <h2>{post.title}</h2>
-            <ul>
-                <li>Publisher : {post.publisher}</li>
-                <li>Detail : {post.detail}</li>
-                <li>Goal : {post.goal}</li>
-                <li>Until {post.date_limit}</li>
-                <li>Price : {post.price_per_time} per 1 time</li>
-            </ul>
-        ''' 
-        for post in posts if post.id == int(pk)]
-    return HTMLTempleate(*article, pk)
+    posts = Goods.objects.get(id=pk)
+    if request.method == "GET":
+        others = Goods.objects.exclude(id=pk)
+        rate = (posts.progress_rate / posts.goal) * 100
+        article = f'''
+            <h2>{posts.title}</h2>
+                <ul>
+                    <li>Publisher : {posts.publisher}</li>
+                    <li>Detail : {posts.detail}</li>
+                    <li>Goal : {posts.goal}</li>
+                    <li>Until {posts.date_limit} (D - {(posts.date_limit - datetime.date.today()).days})</li>
+                    <li>Price : {posts.price_per_time} per 1 time</li>
+                </ul>
+                <h4>Progress rate : {rate}%</h4>
+                <form action="/read/{pk}/" method="POST">
+                    <p><input type="submit" value="Funding this goods"></p>
+                </form>
+            '''
+        for other in others:
+            article += f"<li><a href='/read/{other.id}'>{other.title}</a></li>"
+        return HttpResponse(HTMLTempleate(article, pk))
+    else:
+        posts.progress_rate = posts.progress_rate + 1
+        posts.save()
+        return redirect(f'/read/{pk}')
 
 @csrf_exempt
 def update(request, pk):
@@ -107,9 +138,7 @@ def delete(request):
         return redirect('/')
 
 def HTMLTempleate(article, id=None):
-    posts = Goods.objects.all()
     contextUI = ''
-    ol = ''
 
     if id != None:
         contextUI = f'''
@@ -121,15 +150,13 @@ def HTMLTempleate(article, id=None):
             </li>
             <li><a href="/update/{id}">update</a></li>
         '''
-    for post in posts:
-        ol += f"<li><a href='/read/{post.id}'>{post.title}</a></li>"
+    
     return HttpResponse(f'''
     <html>
     <body>
         <h1><a href="/">CrawedFunding</a></h1>
-        {article}
         <ul>
-            {ol}
+            {article}
         </ul>
         <ul>
             <li><a href="/create/">create</a></li>
